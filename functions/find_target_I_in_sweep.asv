@@ -1,0 +1,360 @@
+function [T_sel, T_all] = find_target_I_in_sweep(fn_abf_path,targetCurrent_pA,varargin)
+
+    yn_plot = 'n';
+    % フィット設定（相対時間[s]）
+    fit_window      = [0.0005, 0.030];   % ステップ開始から 0.5–30 ms
+    baseline_window = [-0.020, -0.002];  % ステップ直前 20–2 ms
+    dV_window = [0.1 0.2];% d
+
+    for ii = 1:nargin-2
+        if strcmp(varargin{ii},'yn_plot')
+            yn_plot = varargin{ii+1};
+        end
+        if strcmp(varargin{ii},'fit_window')
+            fit_window = varargin{ii+1};
+        end
+        if strcmp(varargin{ii},'baseline_window')
+            baseline_window = varargin{ii+1};
+        end
+        if strcmp(varargin{ii},'dV_window')
+            dV_window = varargin{ii+1};
+        end
+    end
+    %targetCurrent_pA = -20;  % 変更可能
+
+    %----------------------------------------------------------------------
+    % チャネル指定（1始まり）。不明な場合は [] にして自動推定を試みます（units: mV/pA から）。
+    voltageChannelIndex = [];   % 例: 1
+    currentChannelIndex = [];   % 例: 2（無い場合は [] のまま）
+    
+    % ステップ開始の手動指定 [秒]（自動検出がうまくいかない場合のフォールバック）
+    manual_t_step_on_sec = [];  % 例: 0.050
+    
+    % ステップ検出の閾値（電流トレースから自動検出する場合）
+    step.minStepAmp_pA   = 5;      % 最低ステップ幅 [pA]
+    step.minPlateau_ms   = 2.0;    % プラトー最小持続 [ms]
+    step.derivThresh_pA_per_samp = 1.0;  % 差分しきい値 [pA/サンプル]
+    
+    % 代表スイープ番号（可視化用）。空にするとスキップ
+    plotExampleSweep = 1;
+    %---------------------------------------------------------------------
+    %% ========= ABF読込 =========
+    [d, si_us, h] = abfload(fn_abf_path);
+    dt = si_us * 1e-6;           % [s]
+    fs = 1 / dt;                 % [Hz]
+    
+    fprintf('Loaded: %s\n', fn_abf_path);
+    fprintf('Sampling interval: %.3f us (fs=%.2f kHz)\n', si_us, fs/1e3);
+    
+    % チャネル自動推定（unitsがあれば mV を電位、pA を電流として推定）
+    if isempty(voltageChannelIndex) || isempty(currentChannelIndex)
+        [vGuess, iGuess] = guessChannelsFromUnits(h);
+        if isempty(voltageChannelIndex), voltageChannelIndex = vGuess; end
+        if isempty(currentChannelIndex), currentChannelIndex = iGuess; end
+    end
+    fprintf('Voltage ch index: %s\n', ternaryStr(~isempty(voltageChannelIndex), num2str(voltageChannelIndex), '[]'));
+    fprintf('Current ch index: %s\n', ternaryStr(~isempty(currentChannelIndex), num2str(currentChannelIndex), '[]'));
+    %% ========= データ形状で分岐 =========
+    if iscell(d)
+        error(['本スクリプトは「イベント駆動・可変長」には未対応です。' ...
+               '固定長モードで取得するか、対象スイープを抽出して長さを揃えてください。']);
+    end
+    
+    dims = ndims(d);
+    if dims == 3
+    % --------------- エピソード固定長 / 波形固定長 ---------------
+    [nPts, nCh, nSweeps] = size(d);
+    t = (0:nPts-1)' * dt;
+
+    if isempty(voltageChannelIndex) || voltageChannelIndex<1 || voltageChannelIndex>nCh
+        error('voltageChannelIndex が不正です。');
+    end
+    if ~isempty(currentChannelIndex) && (currentChannelIndex<1 || currentChannelIndex>nCh)
+        error('currentChannelIndex が不正です。');
+    end
+
+    % ステップ開始時刻の決定：ヘッダに lPreTriggerSamples があればそれを使用
+    if isfield(h, 'lPreTriggerSamples') && ~isempty(h.lPreTriggerSamples) && h.lPreTriggerSamples>0
+        t_step_on = double(h.lPreTriggerSamples) * dt;
+        fprintf('Using header lPreTriggerSamples: t_step_on = %.3f ms\n', t_step_on*1e3);
+    else
+        % 電流トレースから自動検出（代表スイープで検出して共通利用）
+        if ~isempty(currentChannelIndex)
+            I_ex = double(d(:, currentChannelIndex, min(max(1, plotExampleSweep), nSweeps)));
+            t_step_on = detectStepOnsetFromCurrent(I_ex, fs, step);
+            if isnan(t_step_on)
+                if ~isempty(manual_t_step_on_sec)
+                    t_step_on = manual_t_step_on_sec;
+                    fprintf('Auto step detection failed. Using manual t_step_on = %.3f ms\n', t_step_on*1e3);
+                else
+                    error('ステップ開始が検出できません。manual_t_step_on_sec を指定してください。');
+                end
+            else
+                fprintf('Auto-detected t_step_on = %.3f ms (from current)\n', t_step_on*1e3);
+            end
+        else
+            if isempty(manual_t_step_on_sec)
+                error('電流チャネルが無い/不明です。manual_t_step_on_sec を指定してください。');
+            else
+                t_step_on = manual_t_step_on_sec;
+                fprintf('Using manual t_step_on = %.3f ms\n', t_step_on*1e3);
+            end
+        end
+    end
+
+    % ---- 全スイープで tau 推定 ----
+    tau_list   = nan(nSweeps,1);
+    r2_list    = nan(nSweeps,1);
+    t0_list    = nan(nSweeps,1);
+    V0_list    = nan(nSweeps,1);
+    Vinf_list  = nan(nSweeps,1);
+    dV_list  = nan(nSweeps,1);
+
+    for sw = 1:nSweeps
+        V = double(d(:, voltageChannelIndex, sw));  % [mV]
+        TW_baseline = max(1,round((t_step_on + baseline_window(1))/dt)): round((t_step_on+ baseline_window(2))/dt);
+        TW_dV = round((t_step_on + dV_window(1))/dt): round((t_step_on + dV_window(2))/dt);
+        dV_list(sw) = mean(V(TW_dV)) - mean(V(TW_baseline));
+        try
+            res = calc_tau(t, V, t_step_on, fit_window, baseline_window, true);
+            tau_list(sw)  = res.tau;      % [s]
+            r2_list(sw)   = res.r2;
+            t0_list(sw)   = res.t0;
+            V0_list(sw)   = res.V0_est;
+            Vinf_list(sw) = res.Vinf_est;
+        catch ME
+            warning('Sweep %d: tau 推定失敗: %s', sw, ME.message);
+        end
+    end
+
+    %%%%%%%%%%%
+
+    % 1) -20 pA に最も近いインジェクションのスイープを選ぶ
+    
+    
+    % ステップ区間（電流の平均をとる窓）：fit_windowと同じ区間を採用
+
+    % Basal Current Injectionがある場合があるので、差し引く。
+    win_firstend = 0;
+    win_pre_start = t_step_on - fit_window(1);
+    ix_pre_1 = max(1, round(win_firstend / dt));
+    ix_pre_2 = min(numel(t), round(win_pre_start   / dt));
+
+    win_start = t_step_on + fit_window(1);   % 例: 0.0005 s
+    win_end   = t_step_on + fit_window(2);   % 例: 0.030 s
+    ix1 = max(1, round(win_start / dt));
+    ix2 = min(numel(t), round(win_end   / dt));
+    
+    if isempty(currentChannelIndex)
+        error('currentChannelIndex が未指定のため、指定pA 近傍スイープを選別できません。');
+    end
+    
+    % 各スイープのステップ平均電流を算出
+    I_mean = nan(nSweeps,1);
+    for sw = 1:nSweeps
+        I = double(d(:, currentChannelIndex, sw));  % [pA]
+        %I_mean(sw) = mean(I(ix1:ix2), 'omitnan');
+        I_mean(sw) = mean(I(ix1:ix2), 'omitnan') - mean(I(ix_pre_1:ix_pre_2), 'omitnan');% Basal Current Injectionがある場合があるので、差し引く。
+    end
+    
+    % ターゲットに最も近い差を持つスイープ群を選ぶ（複数あるかもしれない）
+    [minDiff, ~] = min(abs(I_mean - targetCurrent_pA));
+    use_mask = abs(I_mean - targetCurrent_pA) == minDiff;
+    
+    fprintf('Target current = %.1f pA. Selected %d sweep(s): %s\n', ...
+        targetCurrent_pA, nnz(use_mask), mat2str(find(use_mask).'));
+    
+    % 2) 品質でさらにフィルタ（任意）
+    % - スパイク混入除外（簡易）
+    has_spike = false(nSweeps,1);
+    for sw = find(use_mask).'
+        V = double(d(:, voltageChannelIndex, sw));
+        dV = [0; diff(V)]/dt;  % mV/s
+        if max(V(ix1:ix2)) > 0 || max(dV(ix1:ix2)) > 50e3  % 例：50 V/s を閾値
+            has_spike(sw) = true;
+        end
+    end
+    % - フィット適合度（R^2）閾値（任意で調整）
+    r2_thresh = 0.95;
+    
+    final_mask = use_mask & ~has_spike & (r2_list >= r2_thresh);
+    if ~any(final_mask)
+        warning('選別後に残るスイープがありません（条件を緩めてください：r2_thresh など）。');
+        final_mask = use_mask;  % 苦し紛れで元maskに戻す
+    end
+    
+    fprintf('After quality filters: %d sweep(s): %s\n', nnz(final_mask), mat2str(find(final_mask).'));
+    
+    % 3) 結果テーブルを「選ばれたスイープのみ」に絞って作り直し（保存も更新）
+    T_all = table((1:nSweeps)', tau_list*1e3, r2_list, ...
+                  t0_list, V0_list, Vinf_list, dV_list, I_mean, ...
+                  ones(size(I_mean))*targetCurrent_pA,...
+                  repmat(fit_window,size(I_mean,1),1),...
+                  repmat(baseline_window,size(I_mean,1),1),...
+        'VariableNames', {'sweep','tau_ms','R2','t0_s','V0_mV','Vinf_mV','dV_mV', 'Imean_pA','targetCurrent_pA','fit_window','baseline_window'});
+    
+    T_sel = T_all(final_mask, :);
+    
+    disp(['--- Tau estimation results (selected: nearest to ' num2str(targetCurrent_pA) ' pA) ---']);
+    disp(T_sel);
+    
+    if 1==2
+    % 保存（ファイル名を分ける）
+    outDir = fileparts(fn_abf_Path);
+    outCsv_all = fullfile(outDir, 'tau_results_all.csv');
+    outCsv_sel = fullfile(outDir, 'tau_results_near_-20pA.csv');
+    
+    writetable(T_all, outCsv_all);
+    writetable(T_sel, outCsv_sel);
+        
+    fprintf('Saved all: %s\n', outCsv_all);
+    fprintf('Saved selected (%d pA near): %s\n', targetCurrent_pA,outCsv_sel);
+    end
+    
+    % 4) 代表スイープの可視化を -20 pA 近傍のものに差し替え（任意）
+    sel_sweeps = find(final_mask);
+    if ~isempty(sel_sweeps)
+        sw = sel_sweeps(1);  % 最初の一つを表示
+        V = double(d(:, voltageChannelIndex, sw));
+        try
+            % ここは既存のフィッター関数名に合わせてください
+            % res = estimate_tau_mat(t, V, t_step_on, fit_window, baseline_window, true);   % CFT 版
+            res = calc_tau(t, V, t_step_on, fit_window, baseline_window, true); % Toolbox不要版
+            if yn_plot == 'y'
+                figure('Name',['Tau fit (' num2str(targetCurrent_pA) ' pA nearest sweep)']);
+                plot(t, V, 'k-'); hold on;
+                plot(res.t_fit, res.model(res.t_fit), 'r-', 'LineWidth', 2);
+                xline(t_step_on, '--b');
+                xlabel('Time [s]'); ylabel('Vm [mV]');
+                title(sprintf('Sweep %d (I=%.1f pA): \\tau = %.2f ms, R^2=%.3f', ...
+                    sw, I_mean(sw), res.tau*1e3, res.r2));
+                legend({'Vm','fit','step on'}, 'Location','best');
+            end
+        catch ME
+            warning('Plot failed: %s', ME.message);
+        end
+    end
+
+    %%%%%%%%%%%
+
+    
+
+    elseif dims == 2
+        % --------------- ギャップフリー ---------------
+        [nPts, nCh] = size(d);
+        t = (0:nPts-1)' * dt;
+    
+        if isempty(voltageChannelIndex) || voltageChannelIndex<1 || voltageChannelIndex>nCh
+            error('voltageChannelIndex が不正です。');
+        end
+        V = double(d(:, voltageChannelIndex));  % [mV]
+    
+        % ステップ開始の決定
+        if ~isempty(currentChannelIndex)
+            if currentChannelIndex<1 || currentChannelIndex>nCh
+                error('currentChannelIndex が不正です。');
+            end
+            I = double(d(:, currentChannelIndex));  % [pA]
+            t_step_on = detectStepOnsetFromCurrent(I, fs, step);
+            if isnan(t_step_on) && ~isempty(manual_t_step_on_sec)
+                t_step_on = manual_t_step_on_sec;
+            end
+        else
+            t_step_on = manual_t_step_on_sec;
+        end
+    
+        if isempty(t_step_on) || isnan(t_step_on)
+            error('ギャップフリー: ステップ開始が検出できません。manual_t_step_on_sec を指定してください。');
+        else
+            fprintf('Gap-free: t_step_on = %.3f ms\n', t_step_on*1e3);
+        end
+    
+        % τ 推定（単一）
+        res = calc_tau(t, V, t_step_on, fit_window, baseline_window, true);
+    
+        fprintf('Gap-free: tau = %.2f ms, R^2=%.3f, V∞=%.2f mV, V0=%.2f mV\n', ...
+            res.tau*1e3, res.r2, res.Vinf_est, res.V0_est);
+    
+        % 結果保存
+        T = table(res.tau*1e3, res.r2, res.t0, res.V0_est, res.Vinf_est, ...
+            'VariableNames', {'tau_ms','R2','t0_s','V0_mV','Vinf_mV'});
+        outCsv = fullfile(fileparts(abfPath), 'tau_results_gapfree.csv');
+        writetable(T, outCsv);
+        fprintf('Saved: %s\n', outCsv);
+    
+        % プロット
+        figure('Name','Tau fit (gap-free)');
+        plot(t, V, 'k-'); hold on;
+        plot(res.t_fit, feval(res.model, res.t_fit), 'r-', 'LineWidth', 2);
+        xline(t_step_on, '--b');
+        xlabel('Time [s]'); ylabel('Vm [mV]');
+        title(sprintf('\\tau = %.2f ms, R^2=%.3f', res.tau*1e3, res.r2));
+        legend({'Vm','fit','step on'}, 'Location','best');
+    
+    else
+        error('未知のデータ次元です。');
+    end
+    
+    %% ========= ローカル関数 =========
+    
+    function [vIdx, iIdx] = guessChannelsFromUnits(h)
+    % h.recChUnits を見て mV を電位, pA を電流としてインデックスを推定
+        vIdx = [];
+        iIdx = [];
+        if isfield(h, 'recChUnits') && ~isempty(h.recChUnits)
+            units = h.recChUnits;
+            for k = 1:numel(units)
+                u = lower(strtrim(units{k}));
+                if contains(u, 'mv') && isempty(vIdx)
+                    vIdx = k;
+                end
+                if contains(u, 'pa') && isempty(iIdx)
+                    iIdx = k;
+                end
+            end
+        end
+    end
+    
+    function t_step_on = detectStepOnsetFromCurrent(I_pA, fs, param)
+    % 電流トレースからステップ開始時刻[s]を簡易検出
+        I = I_pA(:);
+        n = numel(I);
+        if n < 10
+            t_step_on = NaN; return;
+        end
+        % 平滑化（短い中央値→移動平均）
+        winMed = max(3, floor(fs*0.0002));   % ~0.2 ms
+        winMov = max(3, floor(fs*0.0005));   % ~0.5 ms
+        I_med = medfilt1_simple(I, winMed);
+        I_smooth = movmean(I_med, winMov);
+    
+        % 差分としきい値
+        dI = [0; diff(I_smooth)];
+        idxCandidates = find(abs(dI) > param.derivThresh_pA_per_samp);
+        if isempty(idxCandidates)
+            t_step_on = NaN; return;
+        end
+    
+        % 候補から振幅とプラトーで選別
+        minPlateau = max(5, round(param.minPlateau_ms * 1e-3 * fs));
+        t_step_on = [];%NaN;
+        for k = 1:numel(idxCandidates)
+            idx = idxCandidates(k);
+            preIdx  = max(1, idx - minPlateau);
+            postIdx = min(n, idx + minPlateau);
+            dAmp = mean(I_smooth(postIdx:min(n, postIdx+minPlateau-1))) - ...
+                   mean(I_smooth(max(1,preIdx-minPlateau+1):preIdx));
+            if abs(dAmp) >= param.minStepAmp_pA
+                t_step_on = [t_step_on,(idx-1)/fs];
+                break;
+            end
+        end
+    end
+    
+    function s = ternaryStr(cond, a, b)
+        if cond, s = a; else, s = b; end
+    end
+    
+    %--------------------------------------------------------------------------------
+
+end
