@@ -33,6 +33,19 @@ ABF files
 → LDA.m  
 → low-dimensional discriminative representation
 
+## System Requirements
+
+→ MATLAB R2024a or later
+
+## Installation Guide
+
+→ Follow the standard installation procedure for MATLAB code (install time: ~3min)
+
+## Demo Guide
+
+→ Demo input data are included in the repository (expected runtime <3min)
+→ Expected outputs are shown in the corresponding paper (Shama et al., 2026)
+
 ---
 
 # 1. main_IV.m  
