@@ -13,7 +13,7 @@ if ~exist('pn_def','var')
 end
 %---------------------------------------------------------------------------------
 fprintf('\n[ReadMe]\n')
-fprintf('\n1. To run in batch mode, prepare an Excel sheet with a vertical list of filenames, as shown in the sample Excel file.\n');
+fprintf('\n1. To run batch mode, prepare an Excel sheet with a vertical list of filenames, as shown in the sample Excel file.\n');
 fprintf('Sample Excel file is "Scripps Research Dropbox/Lipton Lab/_PatchClmapData/PM2p5/PM2p5 mPFC patch_rev*.xlsm" \n\n');
 fprintf(['2. To run batch mode, Abf files should be stored in the same folder \n...' ...
     'or same/different subfolders in the same folder\n...' ...

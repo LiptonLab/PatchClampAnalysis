@@ -99,7 +99,10 @@ function [mask_exinhi, StackPrescreen] = prescreen_outlier(data_num_import, List
             StackPrescreen.LogAdapIndex_table(:,:,kk) = logdata_table;
         end
     end
-    List_filter = input('Type filter list to include in a vector, just enter = none\n');
+    List_filter = input('Type prescreen/filter list [if multiples filters are made] to include in a vector, just enter = 1\n');
+    if isempty(List_filter)
+        List_filter = 1;
+    end
     List_ax = findall(gcf,'Type','axes');
     for ii = 1:numel(List_filter)
         id_ax = numel(List_ax) + 1 - List_filter(ii);

@@ -38,9 +38,10 @@ end
 
 % Extract data from clipboard
 List_col_category = input('Type category column list in a vector, ex. [2:5]\n');
-List_col_prescreen = input('Type category column list [vector] to exclude/include PV/inhibitory neurons, just enter to integrate excitatory/inhibitory\n');
-ListNumericCol = input('Type columns of numeric data\n');
-ListNumericRow = input('Type rows of numeric data\n');
+List_col_prescreen = input('Type category column list ex,[17] to exclude/include PV/inhibitory neurons, just enter to integrate excitatory/inhibitory\n');
+ListNumericCol = input('Type columns of numeric data, ex[14:22]\n');
+List_col_animal = input('Type animal# column, ex 6\n');
+ListNumericRow = input('Type rows of numeric data ex[10:261]\n');
 Label = LabelExcel(ListNumericCol);
 data_num_import = data(ListNumericRow,ListNumericCol);
 data_category_import = data(ListNumericRow,List_col_category);
@@ -53,6 +54,9 @@ for ii = 1:numel(emptyIdx)
 end
 data_num_import(strcmp(data_num_import, 'NaN')) = {NaN}; %  fill 'NaN' cells with NaN
 data_num_import = cell2mat(data_num_import);
+if ~isempty(List_col_animal)
+    data_animal_import = data(ListNumericRow,List_col_animal);
+end
 
 % Clean data_category_import
 emptyIdx = find(cellfun(@isempty, data_category_import));
@@ -107,11 +111,16 @@ Label_prescreen = Label(find(ismember(ListNumericCol,List_col_prescreen)));
 %---------------------------------------------------------------------------------
 mask_input = mask_cat.*mask_exinhi;
 [data_subset, ListRowSubset, N_total] = pick_subset(data_category_import, id_compare, data_num_import, mask_input, ListCompareName);
+if exist('data_animal_import','var')% if animal info exists
+    for ii = 1:numel(ListRowSubset)
+        animal_subset{ii} = data_animal_import(ListRowSubset{ii});
+    end
+end
 h(1)=gcf;
 %---------------------------------------------------------------------------------
 % STAT
 % prepare data
-sel_stat = input('1:bootstrap only, 2:ttest+bootstrap, 3:ttest+ranksum\n');
+sel_stat = input('1:bootstrap only, 2:ttest+bootstrap, 3:ttest+ranksum, 4:LME (linear mixed effect model)\n');
 factor_out = input('Type factors for MAD, ex 2.5[narrow] 3 to 4.5 [wide] 0 [no cut], just enter=3\n');
 if isempty(factor_out)
     factor_out = 3;
@@ -129,7 +138,11 @@ if numel(data_subset) >=3
             
     end
 else
-    PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,'Label',Label);
+    if exist('animal_subset','var')
+        PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,'Label',Label,'animal_subset',animal_subset);
+    else
+        PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,'Label',Label);
+    end
 end
 
 %--------------------------------------------------------------------------
