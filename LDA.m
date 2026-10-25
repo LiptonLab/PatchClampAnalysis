@@ -36,11 +36,15 @@ end
 
 % Extract data from clipboard
 List_col_category = input('Type category column list in a vector, ex. [2:5]\n');
-List_col_prescreen = input('Type category column list [vector] to exclude/include PV/inhibitory neurons, just enter to integrate excitatory/inhibitory\n');
-ListNumericCol = input('Type columns of numeric data\n');
-ListNumericRow = input('Type rows of numeric data\n');
+List_col_prescreen = input('Type category column list [vector, ex17] to exclude/include PV/inhibitory neurons, just enter to integrate excitatory/inhibitory\n');
+List_col_animal = input('Type animal# column, ex 6\n');
+ListNumericCol = input('Type columns of numeric data, ex 14:18\n');
+ListNumericRow = input('Type rows of numeric data, ex 10:261\n');
 Label = LabelExcel(ListNumericCol);
 data_num_import = data(ListNumericRow,ListNumericCol);
+if ~isempty(List_col_animal)
+    data_animal_import = data(ListNumericRow,List_col_animal);
+end
 data_category_import = data(ListNumericRow,List_col_category);
 List_category = data(1,List_col_category);
 
@@ -104,15 +108,23 @@ Label_prescreen = Label(find(ismember(ListNumericCol,List_col_prescreen)));
 mask_input = mask_cat.*mask_exinhi;
 [data_subset, ListRowSubset, N_total] = pick_subset(data_category_import, id_compare, data_num_import, mask_input, ListCompareName);
 h(1)=gcf;
+if exist('data_animal_import','var')% if animal info exists
+    for ii = 1:numel(ListRowSubset)
+        animal_subset{ii} = data_animal_import(ListRowSubset{ii});
+    end
+end
 %---------------------------------------------------------------------------------
 % STAT
 % prepare data
-sel_stat = input('1:bootstrap only, 2:ttest+bootstrap, 3:ttest+ranksum\n');
+sel_stat = input('1:bootstrap only, 2:ttest+bootstrap, 3:ttest+ranksum 4:LME, []=4\n');
+if isempty(sel_stat)
+    sel_stat = 4;
+end
 factor_out = input('Type factors for MAD, ex 2.5[narrow] 3 to 4.5 [wide] 0 [no cut], just enter=3\n');
 if isempty(factor_out)
     factor_out = 3;
 end
-PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,'Label',Label);
+PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,'Label',Label,'animal_subset',animal_subset);
 %---------------------------------------------------------------------------------
 % ↑from Plot_PV.m
 %---------------------------------------------------------------------------------
@@ -134,7 +146,7 @@ PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,'Label',Label);
 %        boot_proj, ttest_proj:, ranksum_proj, testname: sel_stat_proj:
 %        ex.,2, P_value_proj:
 
-LDAdata = process_LDA(data_num_import,data_category_import,mask_input,List_select,id_compare,factor_out);
+LDAdata = process_LDA(data_num_import,data_category_import,mask_input,List_select,id_compare,factor_out,'data_animal_import',data_animal_import);
 %-----------------------------------------------
 % ↓LDA start
 %-----------------------------------------------
@@ -153,10 +165,7 @@ u = rand(size(X_proj)) - 0.5;             % U ~ Uniform(-1/2, 1/2)
 y = -b * sign(u) .* log(1 - 2*abs(u));    % Laplace(0, b)
 %gscatter(X_proj, y, group_valid);
 gscatter(X_proj, y, ListGroup_packed);
-Label_legend = input('Type Legend such as {"Control","PM2.5"}, input [] to use this default label\n');
-if isempty(Label_legend)
-    Label_legend = {'Control', 'PM2.5'};
-end
+Label_legend = input('Type Legend such as {"Control","PM2.5"}\n');
 legend(Label_legend);
 xlabel(['LDA projection axis, P' testname '=', num2str(P_value_proj)],'FontSize', 14);
 a=gca; a.LineWidth = 1;
@@ -174,8 +183,27 @@ for i = 1:n_features
     fprintf('Parameter %d: %s %.2f degrees, p-value=%d, effectsize = %d\n', i, Label{i}, angles_deg(i), PlotDataAll(i,1).p, PlotDataAll(i,1).esize.g);
     ListAngles = [ListAngles,angles_deg(i)];
 end
-List_invert = input('Type feature# to X-invert angle representation [type vector], (ex, unify parameter vectors to point excitatory direction)\n');
-yn_flip_xaxis = input('Invert X axis y/n\n','s');
+List_invert = input('Type feature# to X-invert angle representation [type vector], (ex [2:4], unify parameter vectors to point excitatory direction)\n');
+
+for i = 1:n_features
+    if ismember(i,List_invert)
+        ListVectors(i,:) = abs(PlotDataAll(i,1).esize.g)*[-cos(LDAdata.angles_deg(i)*pi/180), sin(LDAdata.angles_deg(i)*pi/180)];
+    else
+        ListVectors(i,:) = abs(PlotDataAll(i,1).esize.g)*[cos(LDAdata.angles_deg(i)*pi/180), sin(LDAdata.angles_deg(i)*pi/180)];
+    end
+end
+SumVector = sum(ListVectors, 1);
+fprintf('Sum Vector is %s\n',num2str(SumVector));
+if SumVector(1) < 0
+    yn_flip_xaxis = input('SumVector(x) is negative, Invert X axis for unified display y/n? []=y\n','s');
+    if isempty(yn_flip_xaxis)
+        yn_flip_xaxis = 'y';
+    end
+else
+    fprintf('SumVector(x) is positive, no need to invert X axis\n');
+    yn_flip_xaxis = 'n';
+end
+
 yn_colorode_p = input('Colorcode p-values y/n\n','s');
 yn_lengthcode_ES = input('Show Effectsize by vector length y/n\n','s');
 
@@ -252,18 +280,24 @@ for i = 1:n_features
     angle_display_text = sprintf('%.3g', angle_display);
     deg = char(176);
     if yn_show_p_etc == 'y'
-        text(pax,angle_display*pi/180, rho, [note_p, note_sig, Label(i), string(angle_display_text) + string(deg) ', EffectSZ', num2str(PlotDataAll(i,1).esize.g),' P=' num2str(PlotDataAll(i,1).p)],'Interpreter', 'none');
+        text(pax,angle_display*pi/180, rho, [note_p, note_sig, Label(i), string(angle_display_text) + string(deg) ', EffectSZ', num2str(PlotDataAll(i,1).esize.g),' P=' num2str(PlotDataAll(i,1).p)],'FontSize', 6,'Interpreter', 'none');
     else
-        text(pax,angle_display*pi/180, rho, [note_p, note_sig, Label(i), string(angle_display_text) + string(deg) ],'FontSize', 10,'Interpreter', 'none');
+        text(pax,angle_display*pi/180, rho, [note_p, note_sig, Label(i), string(angle_display_text) + string(deg) ],'FontSize', 6,'Interpreter', 'none');
     end
 end
+% Display SumVector
+rho = sqrt(sum(SumVector.^2,2));
+angle_rad = acos(SumVector(1)/rho);
+polarplot(pax,[0 angle_rad], [0 rho/n_features],'Color','k','LineWidth',2);
+text(pax,angle_rad, rho/n_features, 'mean(vec)' ,'FontSize', 6,'Interpreter', 'none');
+
 pax.RLim(2) = pax.RTick(end);
 pax.RTick = pax.RLim;
 text(pax, 0.85, -0.12, 'Effect Size', ...
      'Units', 'normalized', ...
      'HorizontalAlignment', 'right', ...
      'VerticalAlignment', 'top', ...
-     'FontSize', 10, ...
+     'FontSize', 6, ...
      'FontWeight', 'normal', ...
      'Interpreter', 'none');
 %-------------------------------------------------------------------------------
@@ -278,7 +312,7 @@ if yn_save == 'y'
         set(findall(h(id_fig),'-property','Interpreter'),'Interpreter','none');
         saveas(h(id_fig),[pn_save '\' h(id_fig).Name '_' note '.fig'],'fig')
     end
-    save([pn_save '\LDA data_' note '.mat'],'w_unit','X_proj','group1_proj','group2_proj','lillieTEST','angles_deg','List_category','ListNumericCol','LogAdapIdxExInhLimit','LogAdapIndex_table');
+    save([pn_save '\LDA data_' note '.mat'],'PlotDataAll','LDAdata','angles_deg','List_category','ListNumericCol');
     save([pn_m '\datapath.mat'],'pn_def');% save default folder for next run
 end
 %---------------------------------------------------------------------------------

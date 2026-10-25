@@ -11,6 +11,9 @@ function PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,varargin)
         if strcmp(varargin{ii},'combi_para')
             combi_para = varargin{ii+1};
         end
+        if strcmp(varargin{ii},'animal_subset')%new
+            animal_subset = varargin{ii+1};%new
+        end
     end
     nParameter = size(data_subset{1},2);
     for id_parameter = 1:nParameter
@@ -33,6 +36,10 @@ function PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,varargin)
             PlotDataAll(id_parameter,id_group).N = numel(kept);
             PlotDataAll(id_parameter,id_group).raw = data_subset{id_group}(:,id_parameter);
             PlotDataAll(id_parameter,id_group).nonnan = plotdata(find(~isnan(plotdata)));
+            if exist('animal_subset','var')
+                temp = animal_subset{id_group};
+                PlotDataAll(id_parameter,id_group).animal = temp(idxKept);
+            end
             if exist('Label','var')
                 PlotDataAll(id_parameter,id_group).Label = Label{id_parameter};
             end
@@ -68,6 +75,11 @@ function PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,varargin)
                         bootstraptest2(group1,group2,10000);
                         p = ranksum(group1, group2);
                     end
+                case 4
+                    testname = 'LME';
+                    animal_group1 = PlotDataAll(id_parameter,1).animal;
+                    animal_group2 = PlotDataAll(id_parameter,2).animal;
+                    p = lme_lda(group1,group2,animal_group1,animal_group2);
             end
 
     
