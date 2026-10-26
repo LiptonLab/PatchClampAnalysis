@@ -65,17 +65,23 @@ List_Iin = input(['Type Current injection[pA] values used for Tau calc such as '
 if isempty(List_Iin)
     List_Iin = def_List_Iin;% I injections (pA) to calculate Tau
 end
-rheobase_marginstep = input(['Type additinal current injection above rheobase for firstspike,SpikeAmp,SpikeWidth,threshold,AHP,Sag, just enter' ,num2str(def_rheobase_marginstep) '\n']);
+rheobase_marginstep = input(['Enter N current steps above rheobase to measure firstspike,SpikeAmp,SpikeWidth,threshold,AHP,Sag, just enter= ' ,num2str(def_rheobase_marginstep) 'step\n']);
 if isempty(rheobase_marginstep)
     rheobase_marginstep = def_rheobase_marginstep;% 
 end
-Current_Sag_pA = input(['Type I injection pA to measure Sag, just enter',num2str(def_Current_Sag_pA) '\n']);
+Current_Sag_pA = input(['Type I injection pA to measure Sag, just enter=',num2str(def_Current_Sag_pA) '[pA]\n']);
 if isempty(Current_Sag_pA)
     Current_Sag_pA = def_Current_Sag_pA;% 
 end
 fprintf('If N=3, closer 2 values are used, If N>=4 outliers are removed\n');
-yn_plot_taufit = input('Plot tau fitting? y/n \n','s');
-yn_plot_inflection = input('Plot inflection point for threshold detection? y/n \n','s');
+yn_plot_taufit = input('Plot tau fitting? y/n just enter=n\n \n','s');
+if isempty(yn_plot_taufit)
+    yn_plot_taufit = 'n';
+end
+yn_plot_inflection = input('Plot the inflection point to verify threshold detection? y/n just enter=n\n','s');
+if isempty(yn_plot_inflection)
+    yn_plot_inflection = 'n';
+end
 switch yn_plot_inflection
     case {'y','Y'}
         plot_inflection_01 = 1;
