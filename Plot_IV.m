@@ -127,7 +127,7 @@ if isempty(factor_out)
 end
 
 if numel(data_subset) >=3
-    anova_mode = input('Which anova 1:1way or 2:2ways\n');
+    anova_mode = input('Which anova 1:1way or 2:2ways, ex, [1] for PM2.5 project\n');
     switch anova_mode
         case 1
             PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,'Label',Label, 'anova_mode', 1);
@@ -151,6 +151,50 @@ end
 % Output
 %--------------------------------------------------------------------------
 % Display
+if isfield(PlotDataAll(1,1),'ANOVA1')
+    fprintf('\n');
+    if isfield(PlotDataAll(1,1).ANOVA1,'p')
+        fprintf('P[ANOVA1] are...\n');
+        N_para = size(PlotDataAll,1);
+        for id_para = 1:N_para
+            fprintf('%s,: %d',PlotDataAll(id_para,1).Label, PlotDataAll(id_para,1).ANOVA1.p);
+            if PlotDataAll(id_para,1).ANOVA1.p < 0.05
+                fprintf('\nTukey of %s\n', PlotDataAll(id_para,1).Label);
+                dataT=PlotDataAll(id_para,1).Tukey;
+                for id_pair = 1:size(dataT,1)
+                    fprintf('%d vs %d:', dataT(id_pair,1), dataT(id_pair,2));
+                    fprintf('p=%d ', dataT(id_pair,6));
+                    fprintf('lower=%d ', dataT(id_pair,3));
+                    fprintf('estimate=%d ', dataT(id_pair,4));
+                    fprintf('upper=%d\n', dataT(id_pair,5));
+                end
+            end
+            fprintf('\n');
+        end
+    end
+end
+if isfield(PlotDataAll(1,1),'ANOVA2')
+    fprintf('\n');
+    if isfield(PlotDataAll(1,1).ANOVA2,'p')
+        fprintf('P[ANOVA2] are...\n\n');
+        N_para = size(PlotDataAll,1);
+        for id_para = 1:N_para
+            fprintf('%s,: %d',PlotDataAll(id_para,1).Label, PlotDataAll(id_para,1).ANOVA2.p);
+            if PlotDataAll(id_para,1).ANOVA2.p < 0.05
+                fprintf('\nTukey of %s\n', PlotDataAll(id_para,1).Label);
+                dataT=PlotDataAll(id_para,1).Tukey;
+                for id_pair = 1:size(dataT,1)
+                    fprintf('%d vs %d:', dataT(id_pair,1), dataT(id_pair,2));
+                    fprintf('p=%d ', dataT(id_pair,6));
+                    fprintf('lower=%d ', dataT(id_pair,3));
+                    fprintf('estimate=%d ', dataT(id_pair,4));
+                    fprintf('upper=%d\n', dataT(id_pair,5));
+                end
+            end
+            fprintf('\n');
+        end
+    end
+end
 %--------------------------------------------------------------------------
 h(2) = figure('Name','PlotIVdata','Color','w'); 
 ListGrouLabel = input('Type Legend such as {"Control","PM2.5"}\n');

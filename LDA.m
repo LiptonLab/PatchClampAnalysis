@@ -216,6 +216,9 @@ else
     pax.ThetaZeroLocation = 'left';
     pax.ThetaDir = 'clockwise';
     set(h(2).CurrentAxes,'XDir','rev');
+    ax = findobj(h(2),'Type','axes');
+    xt = ax(1).XTick;
+    ax(1).XTickLabel = string(-xt);
 end
 pax.ThetaLim = [0 180];
 pax.ThetaTick = [0 90 180];

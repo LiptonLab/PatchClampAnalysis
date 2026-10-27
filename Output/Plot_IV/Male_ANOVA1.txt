@@ -1,0 +1,29 @@
+P[ANOVA1] are...
+FI_slope,: 7.307781e-01
+FirstSpikeLatency_s,: 1.367158e-02
+Tukey of FirstSpikeLatency_s
+1 vs 2:p=9.451142e-01 lower=-1.327128e-01 estimate=-1.554950e-02 upper=1.016138e-01
+1 vs 3:p=1.744606e-02 lower=-2.435629e-01 estimate=-1.316562e-01 upper=-1.974955e-02
+2 vs 3:p=5.601501e-02 lower=-2.346325e-01 estimate=-1.161067e-01 upper=2.419030e-03
+
+SpikeThreshold_mV,: 3.987099e-01
+AdaptationIndex,: 8.370025e-01
+SpikeAmplitude_mV,: 2.185424e-02
+Tukey of SpikeAmplitude_mV
+1 vs 2:p=4.359152e-01 lower=-4.077352e+00 estimate=4.304885e+00 upper=1.268712e+01
+1 vs 3:p=2.092858e-01 lower=-1.369728e+01 estimate=-5.691126e+00 upper=2.315033e+00
+2 vs 3:p=1.719111e-02 lower=-1.847572e+01 estimate=-9.996011e+00 upper=-1.516302e+00
+
+slope10_90_mVsec,: 2.614540e-02
+Tukey of slope10_90_mVsec
+1 vs 2:p=6.975185e-01 lower=-7.458621e+01 estimate=3.781735e+01 upper=1.502209e+02
+1 vs 3:p=1.244010e-01 lower=-1.959851e+02 estimate=-8.862461e+01 upper=1.873584e+01
+2 vs 3:p=2.600265e-02 lower=-2.401526e+02 estimate=-1.264420e+02 upper=-1.273134e+01
+
+SpikeWidth_sec,: 8.718259e-01
+AHP_mV,: 2.386642e-01
+Sag,: 2.852464e-02
+Tukey of Sag
+1 vs 2:p=9.670582e-01 lower=-1.124201e-01 estimate=-1.042463e-02 upper=9.157088e-02
+1 vs 3:p=6.189387e-02 lower=-3.761517e-03 estimate=9.365784e-02 upper=1.910772e-01
+2 vs 3:p=4.760237e-02 lower=9.009295e-04 estimate=1.040825e-01 upper=2.072640e-01

@@ -1,0 +1,15 @@
+P[ANOVA1] are...
+FI_slope,: 8.580251e-01
+FirstSpikeLatency_s,: 4.054075e-01
+SpikeThreshold_mV,: 1.347258e-01
+AdaptationIndex,: 5.453487e-02
+SpikeAmplitude_mV,: 5.733022e-01
+slope10_90_mVsec,: 4.287700e-02
+Tukey of slope10_90_mVsec
+1 vs 2:p=3.485418e-02 lower=7.338093e+00 estimate=1.236429e+02 upper=2.399478e+02
+1 vs 3:p=1.403762e-01 lower=-2.271723e+01 estimate=9.064271e+01 upper=2.040027e+02
+2 vs 3:p=6.866170e-01 lower=-1.291424e+02 estimate=-3.300023e+01 upper=6.314199e+01
+
+SpikeWidth_sec,: 5.326464e-01
+AHP_mV,: 9.610722e-01
+Sag,: 1.915676e-01

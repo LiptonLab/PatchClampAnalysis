@@ -110,7 +110,7 @@ function PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,varargin)
                 PlotDataAll(id_parameter,1).ANOVA1.p = p;
                 PlotDataAll(id_parameter,1).ANOVA1.stats = stats;
                 PlotDataAll(id_parameter,1).ANOVA1.tbl = tbl;
-                PlotDataAll(id_parameter,1).Tukey = result(result(:,6) < 0.05, :);
+                PlotDataAll(id_parameter,1).Tukey = result;
 
             case 2
                 data_stack = [];
@@ -138,7 +138,7 @@ function PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,varargin)
                 PlotDataAll(id_parameter,1).ANOVA2.p = p;
                 PlotDataAll(id_parameter,1).ANOVA2.stats = stats;
                 PlotDataAll(id_parameter,1).ANOVA2.tbl = tbl;
-                PlotDataAll(id_parameter,1).Tukey = result(result(:,6) < 0.05, :);
+                PlotDataAll(id_parameter,1).Tukey = result;
         end
 
     end
