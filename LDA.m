@@ -146,7 +146,8 @@ PlotDataAll = multi_stat(data_subset,sel_stat,factor_out,'Label',Label,'animal_s
 %        boot_proj, ttest_proj:, ranksum_proj, testname: sel_stat_proj:
 %        ex.,2, P_value_proj:
 
-LDAdata = process_LDA(data_num_import,data_category_import,mask_input,List_select,id_compare,factor_out,'data_animal_import',data_animal_import);
+yn_Znorm = input('Z-score normalization before LDA y/n','s');
+LDAdata = process_LDA(data_num_import,data_category_import,mask_input,List_select,id_compare,factor_out,'data_animal_import',data_animal_import,'yn_Znorm',yn_Znorm);
 %-----------------------------------------------
 % ↓LDA start
 %-----------------------------------------------

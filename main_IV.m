@@ -12,6 +12,11 @@ if ~exist('pn_def','var')
     pn_def = '';
 end
 %---------------------------------------------------------------------------------
+recursiveSearchSupported = ~verLessThan('matlab','9.1');
+if recursiveSearchSupported == 1
+    fprintf("This MATLAB version supports recursive file search across all directory levels.\n");
+end
+%---------------------------------------------------------------------------------
 fprintf('\n[ReadMe]\n')
 fprintf('\n1. To run batch mode, prepare an Excel sheet with a vertical list of filenames, as shown in the sample Excel file.\n');
 fprintf('Sample Excel file is "Scripps Research Dropbox/Lipton Lab/_PatchClmapData/PM2p5/PM2p5 mPFC patch_rev*.xlsm" \n\n');
@@ -23,10 +28,10 @@ fprintf('Sample Data Folder is "Scripps Research Dropbox/Lipton Lab/_PatchClmapD
 void = input('Type enter when ready\n');
 %---------------------------------------------------------------------------------
 % Import Abf files
-pn_abf_top = uigetdir(pn_def,'select data folder, you can select parent folder or grandparent folder');
-select_order = input('Is it 1:parent folder 2:grandparent folder 3:grandgrandparent folder, just enter = 2\n');
-if isempty(select_order)
-    select_order = 2;
+if recursiveSearchSupported == 1
+    pn_abf_top = uigetdir(pn_def,'Select the parent folder to search for .abf files in all subfolders');
+else
+    pn_abf_top = uigetdir(pn_def,'Select the parent folder to search for .abf files up to 3 subfolder levels deep.');
 end
 %---------------------------------------------------------------------------------
 pn_def=pn_abf_top;
@@ -44,14 +49,17 @@ switch fn_select_mode
         %List_fn_abf = List_fn_abf(ListPick);
 end
 
-for id_file = 1:numel(List_fn_abf)
-    switch select_order
-        case 1
-            List_fn_abf_full{id_file} = dir(fullfile(pn_abf_top,[List_fn_abf{id_file}]));
-        case 2
-            List_fn_abf_full{id_file} = dir(fullfile(pn_abf_top,'*',[List_fn_abf{id_file}]));
-        case 3
-            List_fn_abf_full{id_file} = dir(fullfile(pn_abf_top,'*','*',[List_fn_abf{id_file}]));
+if recursiveSearchSupported == 1
+    for id_file = 1:numel(List_fn_abf)
+        List_fn_abf_full{id_file} = dir(fullfile(pn_abf_top,'**',[List_fn_abf{id_file}]));
+    end
+else
+    for id_file = 1:numel(List_fn_abf)
+        List_fn_abf_full_1 = dir(fullfile(pn_abf_top,[List_fn_abf{id_file}]));
+        List_fn_abf_full_2 = dir(fullfile(pn_abf_top,'*',[List_fn_abf{id_file}]));
+        List_fn_abf_full_3 = dir(fullfile(pn_abf_top,'*','*',[List_fn_abf{id_file}]));
+        List_fn_abf_full_4 = dir(fullfile(pn_abf_top,'*','*','*',[List_fn_abf{id_file}]));
+        List_fn_abf_full{id_file} = [List_fn_abf_full_1; List_fn_abf_full_2; List_fn_abf_full_3];
     end
 end
 

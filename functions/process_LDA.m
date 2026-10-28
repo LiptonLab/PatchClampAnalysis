@@ -1,8 +1,13 @@
 function LDAdata = process_LDA(data_num_import,data_category_import,mask_input,List_select,id_compare,factor_out,varargin)
 
+    % default
+    yn_Znorm = 'y';
     for ii = 1:nargin - 6
         if strcmp(varargin{ii},'data_animal_import')%new
             data_animal_import = varargin{ii+1};%new
+        end
+        if strcmp(varargin{ii},'yn_Znorm')%new
+            yn_Znorm = varargin{ii+1};%new
         end
     end
 
@@ -15,8 +20,10 @@ function LDAdata = process_LDA(data_num_import,data_category_import,mask_input,L
     end
     
     %lda
-    temp = DataNum_packed - mean(DataNum_packed,1);
-    DataNum_packed = temp ./ std(temp,1);
+    if yn_Znorm == 'y'
+        temp = DataNum_packed - mean(DataNum_packed,1);
+        DataNum_packed = temp ./ std(temp,1);
+    end
 
     LDAdata.lda = fitcdiscr(DataNum_packed, ListGroup_packed);
     LDAdata.DataNum_packed = DataNum_packed;%Add input data as new field

@@ -151,6 +151,8 @@ end
 % Output
 %--------------------------------------------------------------------------
 % Display
+tempFile_anova = 'ANOVA.txt';
+diary(tempFile_anova);
 if isfield(PlotDataAll(1,1),'ANOVA1')
     fprintf('\n');
     if isfield(PlotDataAll(1,1).ANOVA1,'p')
@@ -195,6 +197,7 @@ if isfield(PlotDataAll(1,1),'ANOVA2')
         end
     end
 end
+diary off;
 %--------------------------------------------------------------------------
 h(2) = figure('Name','PlotIVdata','Color','w'); 
 ListGrouLabel = input('Type Legend such as {"Control","PM2.5"}\n');
@@ -241,7 +244,10 @@ if yn_save == 'y'
         saveas(h(id_fig),[pn_save '\' h(id_fig).Name '_' note '.fig'],'fig')
     end
     save([pn_save '\PlotIVdata_' note '.mat'],'PlotDataAll','StackPrescreen','N_total');
+    movefile(tempFile_anova, [pn_save '\ANOVA_' note '.txt']);
     save([pn_m '\datapath.mat'],'pn_def');
+else
+    delete(tempFile_anova);
 end
 %--------------------------------------------------------------------------
 %--------------------------------------------------------------------------
